@@ -101,6 +101,7 @@ include api/Makefile.mk
 include bin/Makefile.mk
 include backends/Makefile.mk
 include common/Makefile.mk
+include clustering/Makefile.mk
 include examples/Makefile.mk
 include expand/Makefile.mk
 include geospatial/Makefile.mk
