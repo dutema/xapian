@@ -1,0 +1,5 @@
+<Directory>clustering</Directory>
+
+<Description>
+Implementations of clustering algorithms for Xapian.
+</Description>
