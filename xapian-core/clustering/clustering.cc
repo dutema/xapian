@@ -20,13 +20,35 @@ Xapian::ClusterAssignment::getDocsByCluster(int clusterid) const {
         return i->second;
 }
 
-const std::map<Xapian::docid, FeatureVector>&
-Xapian::FeatureVectorBuilder::getVectors() {
-    return feature_vectors;
+const Xapian::FeatureVector&
+Xapian::FeatureVectorBuilder::getVectorByDocid(Xapian::docid docid) const{
+    std::map<Xapian::docid, Xapian::FeatureVector>::const_iterator i =
+            feature_vectors.find(docid);
+    if(i == feature_vectors.end()) {
+        throw Xapian::InvalidArgumentError("Invalid docid");
+    }
+    return i->second;
 }
 
-const ClusterAssignment&
-Xapian::ClusteringAlgorithm::getResult() const {
+void
+Xapian::ClusteringAlgorithm::clearClusterToDocs() {
+    results.cluster_to_docs.clear();
+}
+
+void
+Xapian::ClusteringAlgorithm::setClusterForDoc(Xapian::docid docid,
+        int clusterid) {
+    results.doc_to_cluster[docid] = clusterid;
+}
+
+void
+Xapian::ClusteringAlgorithm::addDocForCluster(int clusterid,
+        Xapian::docid docid) {
+    results.cluster_to_docs[clusterid].push_back(docid);
+}
+
+const Xapian::ClusterAssignment&
+Xapian::ClusteringAlgorithm::getResults() const {
     return results;
 }
 
@@ -34,7 +56,7 @@ double
 Xapian::CosineSimilarity::similarity(const FeatureVector& v1,
         const FeatureVector& v2) const {
     double inner = 0.0;
-    FeatureVector::iterator v1_iter = v1.begin(), v2_iter = v2.begin();
+    FeatureVector::const_iterator v1_iter = v1.begin(), v2_iter = v2.begin();
     for(; v1_iter != v1.end(); v1_iter++) {
         while(v2_iter != v2.end() && v2_iter->first < v1_iter->first) {
             v2_iter++;
@@ -53,7 +75,7 @@ void Xapian::KMeans::init_centroids() {
     MSetIterator miter = mset.begin();
     int i;
     for(i = 0; i < cluster_count; ++i, miter++) {
-        centroids.push_back(std::map(miter->get_document()));
+        centroids.push_back(builder->getVectorByDocid(*miter));
     }
 }
 
@@ -62,39 +84,40 @@ Xapian::KMeans::assign_centroids() {
     MSetIterator miter;
     std::vector<FeatureVector>::iterator citer;
     double sim, msim = std::numeric_limits<double>::max();
-    int mindex;
-    results.cluster_to_docs.clear();
+    int mindex = -1;
+    clearClusterToDocs();
     for(miter = mset.begin(); miter != mset.end(); miter++) {
         for(citer = centroids.begin(); citer != centroids.end(); citer++) {
-            sim = metric.similarity(*citer, builder.getVectorByDocid(*miter));
+            sim = metric->similarity(*citer, builder->getVectorByDocid(*miter));
             if(sim < msim) {
                 msim = sim;
                 mindex = *miter;
             }
         }
-        results.doc_to_cluster[*miter] = mindex;
-        results.cluster_to_docs[mindex].pushback(*miter);
+        setClusterForDoc(*miter, mindex);
+        addDocForCluster(mindex, *miter);
     }
 }
 
 void
 Xapian::KMeans::compute_centroids() {
     std::vector<FeatureVector>::iterator citer;
-    const std::vector<Xapian::docid>& docs;
-    std::vector<Xapian::docid>::iterator viter;
+    std::vector<Xapian::docid>::const_iterator viter;
+    FeatureVector::const_iterator cfiter;
     FeatureVector::iterator fiter;
     double denom;
-    for(citer = centroids.begin(); citer != centroids.end(); citer++) {
-        *citer.clear();
-        docs = results.getDocsByCluster(*citer);
+    unsigned int i;
+    for(i = 0; i < centroids.size(); ++i) {
+        centroids[i].clear();
+        const std::vector<Xapian::docid>& docs = results.getDocsByCluster(i);
         for(viter = docs.begin(); viter != docs.end(); viter++) {
-            const FeatureVector& vect = builder.getVectorByDocid(*viter);
-            for(fiter = vect.begin(); fiter != vect.end(); fiter++) {
-                *citer[fiter->first] += fiter->second;
+            const FeatureVector& vect = builder->getVectorByDocid(*viter);
+            for(cfiter = vect.begin(); cfiter != vect.end(); cfiter++) {
+                centroids[i][cfiter->first] += cfiter->second;
             }
         }
         denom = (double)docs.size();
-        for(fiter = (*citer).begin(); fiter != (*citer).end(); fiter++) {
+        for(fiter = centroids[i].begin(); fiter != centroids[i].end(); fiter++) {
             fiter->second /= denom;
         }
     }

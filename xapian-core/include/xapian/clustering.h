@@ -30,8 +30,11 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <limits>
 
 namespace Xapian {
+
+typedef std::map<std::string, double> FeatureVector;
 
 class Document;
 class ClusteringAlgorithm;
@@ -47,14 +50,12 @@ class XAPIAN_VISIBILITY_DEFAULT ClusterAssignment {
 
 };
 
-typedef std::map<std::string, double> FeatureVector;
-
 class XAPIAN_VISIBILITY_DEFAULT FeatureVectorBuilder {
   protected:
     std::map<Xapian::docid, FeatureVector> feature_vectors;
   public:
     virtual void buildFeatureVectors(Xapian::MSet) = 0;
-    const FeatureVector& getVectorByDocid() const;
+    const FeatureVector& getVectorByDocid(Xapian::docid) const;
 };
 
 class XAPIAN_VISIBILITY_DEFAULT TFIDF : public FeatureVectorBuilder{
@@ -75,14 +76,19 @@ class XAPIAN_VISIBILITY_DEFAULT SimilarityMetric {
 };
 
 class XAPIAN_VISIBILITY_DEFAULT CosineSimilarity : public SimilarityMetric {
+  public:
+    double similarity(const FeatureVector&, const FeatureVector&) const;
 };
 
 class XAPIAN_VISIBILITY_DEFAULT ClusteringAlgorithm {
   protected:
     Xapian::MSet mset;
     ClusterAssignment results;
+    void clearClusterToDocs();
+    void setClusterForDoc(Xapian::docid, int);
+    void addDocForCluster(int, Xapian::docid);
   public:
-    ClusteringAlgorithm(Xapian::MSet mset) : mset(mset) {
+    ClusteringAlgorithm(Xapian::MSet _mset) : mset(_mset) {
     }
     virtual void cluster() = 0;
     const ClusterAssignment& getResults() const;
@@ -93,17 +99,17 @@ class XAPIAN_VISIBILITY_DEFAULT KMeans : public ClusteringAlgorithm {
     int cluster_count;
     int max_iter;
     std::vector<FeatureVector> centroids;
-    SimilarityMetric metric;
-    FeatureVectorBuilder builder;
+    SimilarityMetric* metric;
+    FeatureVectorBuilder* builder;
   private:
     void init_centroids();
     void assign_centroids();
     void compute_centroids();
   public:
-    KMeans(Xapian::MSet mset, int cluster_count, int max_iter,
-            SimilarityMetric metric, FeatureVectorBuilder builder) :
-            mset(mset), cluster_count(cluster_count), max_iter(max_iter),
-            metric(metric), builder(builder) {
+    KMeans(Xapian::MSet _mset, int _cluster_count, int _max_iter,
+            SimilarityMetric* _metric, FeatureVectorBuilder* _builder) :
+            ClusteringAlgorithm(_mset), cluster_count(_cluster_count),
+            max_iter(_max_iter), metric(_metric), builder(_builder) {
     }
     void cluster();
 };
