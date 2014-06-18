@@ -30,75 +30,81 @@
 #include <map>
 #include <string>
 #include <vector>
-#include <limits>
 
 namespace Xapian {
 
-typedef std::map<std::string, double> FeatureVector;
+/** The feature vector for a document
+ *
+ *  The feature vector is an n-dimensional vector which contains a numerical
+ *  feature for each term in the document
+ */
+typedef std::map<std::string, double> feature_vector;
 
 class Document;
 class ClusteringAlgorithm;
 
-class XAPIAN_VISIBILITY_DEFAULT ClusterAssignment {
+class XAPIAN_VISIBILITY_DEFAULT ClusterAssignment
+{
   protected:
-    std::map<Xapian::docid, int> doc_to_cluster;
-    std::map<int, std::vector<Xapian::docid> > cluster_to_docs;
+    std::map<docid, clusterid> doc_to_cluster;
+    std::map<clusterid, std::vector<docid> > cluster_to_docs;
     friend class ClusteringAlgorithm;
   public:
-    int getClusterByDoc(Xapian::docid) const;
-    const std::vector<Xapian::docid>& getDocsByCluster(int) const;
-
+    clusterid get_cluster_by_doc(docid) const;
+    const std::vector<docid>& get_docs_by_cluster(clusterid) const;
 };
 
-class XAPIAN_VISIBILITY_DEFAULT FeatureVectorBuilder {
+class XAPIAN_VISIBILITY_DEFAULT FeatureVectorBuilder
+{
   protected:
-    std::map<Xapian::docid, FeatureVector> feature_vectors;
+    std::map<docid, feature_vector> feature_vectors;
   public:
-    virtual void buildFeatureVectors(Xapian::MSet) = 0;
-    const FeatureVector& getVectorByDocid(Xapian::docid) const;
+    virtual void build_feature_vectors(MSet) = 0;
+    const feature_vector& get_vector_by_docid(docid) const;
 };
 
-class XAPIAN_VISIBILITY_DEFAULT TFIDF : public FeatureVectorBuilder{
+class XAPIAN_VISIBILITY_DEFAULT TFIDF : public FeatureVectorBuilder
+{
   protected:
-    std::map<std::string, int> termfreqs;
+    std::map<std::string, termcount> termfreqs;
   private:
-    void computeTF(Xapian::MSet);
-    const FeatureVector& computeTFIDF(Xapian::MSet) const;
+    void compute_tf(MSet);
+    const feature_vector& compute_tfidf(MSet) const;
   public:
-    virtual void buildFeatureVectors(Xapian::MSet);
+    virtual void build_feature_vectors(MSet);
 };
 
 class XAPIAN_VISIBILITY_DEFAULT SimilarityMetric {
   public:
     SimilarityMetric() {
     }
-    virtual double similarity(const FeatureVector&, const FeatureVector&) const = 0;
+    virtual double similarity(const feature_vector&, const feature_vector&) const = 0;
 };
 
 class XAPIAN_VISIBILITY_DEFAULT CosineSimilarity : public SimilarityMetric {
   public:
-    double similarity(const FeatureVector&, const FeatureVector&) const;
+    double similarity(const feature_vector&, const feature_vector&) const;
 };
 
 class XAPIAN_VISIBILITY_DEFAULT ClusteringAlgorithm {
   protected:
-    Xapian::MSet mset;
+    MSet mset;
     ClusterAssignment results;
-    void clearClusterToDocs();
-    void setClusterForDoc(Xapian::docid, int);
-    void addDocForCluster(int, Xapian::docid);
+    void clear_cluster_to_docs();
+    void set_cluster_for_doc(docid, clusterid);
+    void add_doc_for_cluster(clusterid, docid);
   public:
-    ClusteringAlgorithm(Xapian::MSet _mset) : mset(_mset) {
+    ClusteringAlgorithm(MSet _mset) : mset(_mset) {
     }
     virtual void cluster() = 0;
-    const ClusterAssignment& getResults() const;
+    const ClusterAssignment& get_results() const;
 };
 
 class XAPIAN_VISIBILITY_DEFAULT KMeans : public ClusteringAlgorithm {
   protected:
-    int cluster_count;
-    int max_iter;
-    std::vector<FeatureVector> centroids;
+    clustercount cluster_count;
+    unsigned int max_iter;
+    std::vector<feature_vector> centroids;
     SimilarityMetric* metric;
     FeatureVectorBuilder* builder;
   private:
@@ -106,7 +112,7 @@ class XAPIAN_VISIBILITY_DEFAULT KMeans : public ClusteringAlgorithm {
     void assign_centroids();
     void compute_centroids();
   public:
-    KMeans(Xapian::MSet _mset, int _cluster_count, int _max_iter,
+    KMeans(MSet _mset, clustercount _cluster_count, unsigned int _max_iter,
             SimilarityMetric* _metric, FeatureVectorBuilder* _builder) :
             ClusteringAlgorithm(_mset), cluster_count(_cluster_count),
             max_iter(_max_iter), metric(_metric), builder(_builder) {

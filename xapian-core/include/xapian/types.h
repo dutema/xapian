@@ -29,6 +29,20 @@
 
 namespace Xapian {
 
+/** A count of clusters.
+ *
+ *  This is used to hold values such as the number of clusters an algorithm
+ *  should return
+ */
+typedef unsigned clustercount;
+
+/** A unique identifier for a cluster
+ *
+ *  Clusterid 0 is invalid, providing an "out of range" value which can be
+ *  used to mean "not a valid cluster".
+ */
+typedef unsigned clusterid;
+
 /** A count of documents.
  *
  *  This is used to hold values such as the number of documents in a database
